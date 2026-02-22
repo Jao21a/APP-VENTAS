@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "framer-motion": "^12.34.3",
+    "react-hot-toast": "^2.6.0"
+  },
+  "devDependencies": {
+    "vite-plugin-pwa": "^1.2.0"
+  }
+}
