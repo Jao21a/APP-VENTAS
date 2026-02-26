@@ -79,9 +79,30 @@ export function AdminLayout() {
                     </button>
                 </header>
 
-                <main className="flex-1 px-4 lg:px-8 py-6 max-w-7xl mx-auto w-full">
+                <main className="flex-1 px-4 lg:px-8 py-6 pb-24 lg:pb-6 max-w-7xl mx-auto w-full">
                     <Outlet />
                 </main>
+
+                {/* Mobile Navigation */}
+                <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-black/5 pb-safe z-40 px-6 py-2 flex justify-between items-center shadow-[0_-4px_24px_rgba(0,0,0,0.04)]">
+                    {links.map((link) => (
+                        <NavLink
+                            key={link.to}
+                            to={link.to}
+                            className={({ isActive }) => cn(
+                                "flex flex-col items-center gap-1 p-2 rounded-xl transition-all",
+                                isActive ? "text-[var(--primary-color)] scale-110" : "text-[#8E8E93]"
+                            )}
+                        >
+                            {({ isActive }) => (
+                                <>
+                                    <link.icon className={cn("w-6 h-6", isActive ? "stroke-[3px]" : "")} />
+                                    <span className="text-[9px] font-bold uppercase tracking-widest">{link.label}</span>
+                                </>
+                            )}
+                        </NavLink>
+                    ))}
+                </nav>
             </div>
 
             <NewOrderModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
