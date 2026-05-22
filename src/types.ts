@@ -8,6 +8,9 @@ export interface Order {
   status: OrderStatus;
   total: number;
   delivery_person?: string;
+  location_link?: string;
+  lat?: number;
+  lng?: number;
   created_at: string;
 }
 

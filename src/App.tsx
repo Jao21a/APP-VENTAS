@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AdminLayout } from './components/layout/AdminLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Deliverys } from './pages/Deliverys';
+import { MapPage } from './pages/MapPage';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { useSettingsStore } from './store/useSettingsStore';
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/" element={<AdminLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="deliverys" element={<Deliverys />} />
+          <Route path="map" element={<MapPage />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
         </Route>

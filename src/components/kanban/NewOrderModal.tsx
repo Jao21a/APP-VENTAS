@@ -22,7 +22,10 @@ export function NewOrderModal({ isOpen, onClose }: Props) {
         customer_name: '',
         customer_phone: '',
         total: '',
-        additional: ''
+        additional: '',
+        location_link: '',
+        lat: '',
+        lng: ''
     });
 
     const toggleFlavor = (flavor: string) => {
@@ -51,17 +54,25 @@ export function NewOrderModal({ isOpen, onClose }: Props) {
             orderDetails += ` + ${newOrder.additional.trim()}`;
         }
 
-        const created = await createOrder({
+        const payload: any = {
             customer_name: newOrder.customer_name,
             customer_phone: newOrder.customer_phone,
             order_details: orderDetails,
             total: parseFloat(newOrder.total) || 0,
             status: 'pending'
-        });
+        };
+
+        if (newOrder.location_link) payload.location_link = newOrder.location_link;
+        if (newOrder.lat && newOrder.lng) {
+            payload.lat = parseFloat(newOrder.lat);
+            payload.lng = parseFloat(newOrder.lng);
+        }
+
+        const created = await createOrder(payload);
 
         if (created) {
             onClose();
-            setNewOrder({ customer_name: '', customer_phone: '', total: '', additional: '' });
+            setNewOrder({ customer_name: '', customer_phone: '', total: '', additional: '', location_link: '', lat: '', lng: '' });
             setSelectedFlavors([]);
             setSelectedPortion('10');
         } else {
@@ -162,6 +173,34 @@ export function NewOrderModal({ isOpen, onClose }: Props) {
                                         value={newOrder.customer_phone}
                                         onChange={(e) => setNewOrder({ ...newOrder, customer_phone: e.target.value })}
                                     />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-baseline">
+                                        <label className="text-[10px] font-black text-[#8E8E93] uppercase tracking-widest ml-1">Enlace de Ubicación / Coordenadas</label>
+                                        {(newOrder.lat && newOrder.lng) && (
+                                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">✓ Mapa Activo</span>
+                                        )}
+                                    </div>
+                                    <input
+                                        type="text"
+                                        className="w-full px-4 py-3 rounded-xl bg-[#F2F2F7] border border-black/5 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all"
+                                        placeholder="Ej: https://maps.google.com/?q=-12.04,-77.02 o pega lat, lng..."
+                                        value={newOrder.location_link}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            // Extract lat lng if possible
+                                            const match = val.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+                                            if (match) {
+                                                setNewOrder({ ...newOrder, location_link: val, lat: match[1], lng: match[2] });
+                                            } else {
+                                                setNewOrder({ ...newOrder, location_link: val, lat: '', lng: '' });
+                                            }
+                                        }}
+                                    />
+                                    {newOrder.location_link && !newOrder.lat && (
+                                        <p className="text-[10px] text-orange-500 ml-1">Asegúrate que el enlace tenga las coordenadas.</p>
+                                    )}
                                 </div>
 
                                 <div className="space-y-1">

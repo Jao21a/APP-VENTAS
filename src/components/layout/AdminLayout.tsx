@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { ShoppingBag, Truck, BarChart3, Settings, Plus } from 'lucide-react';
+import { ShoppingBag, Truck, BarChart3, Settings, Plus, Map } from 'lucide-react';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { NewOrderModal } from '../kanban/NewOrderModal';
 import { clsx, type ClassValue } from 'clsx';
@@ -16,6 +16,7 @@ export function AdminLayout() {
     const links = [
         { to: "/", icon: ShoppingBag, label: "Pedidos" },
         { to: "/deliverys", icon: Truck, label: "Repartidores" },
+        { to: "/map", icon: Map, label: "Mapa" },
         { to: "/reports", icon: BarChart3, label: "Reportes" },
         { to: "/settings", icon: Settings, label: "Configuración" },
     ];
