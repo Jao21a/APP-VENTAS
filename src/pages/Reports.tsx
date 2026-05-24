@@ -12,7 +12,7 @@ const PORTIONS = ['5', '10', '20'];
 
 export function Reports() {
     const { orders, flavors } = useOrderStore();
-    const { primaryColor, orderTimelines } = useSettingsStore();
+    const { primaryColor, orderTimelines, orderPayments } = useSettingsStore();
 
     const stats = useMemo(() => {
         const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
@@ -29,6 +29,17 @@ export function Reports() {
         let deliveredTimeCount = 0;
 
         const driverDeliveryTimes: Record<string, { totalTime: number; count: number }> = {};
+
+        // Cash reconciliation variables
+        let totalCash = 0;
+        let totalYape = 0;
+        let totalPendingYape = 0;
+        const paymentMethodCounts: Record<string, number> = {
+            'efectivo': 0,
+            'yape': 0,
+            'mixto': 0,
+            'pendiente_yape': 0
+        };
 
         orders.forEach(order => {
             flavors.forEach(flavor => {
@@ -85,6 +96,27 @@ export function Reports() {
                     }
                 }
             }
+
+            // Calculate payment reconciliation (only for delivered orders)
+            const payment = orderPayments[order.id];
+            if (payment && order.status === 'delivered') {
+                paymentMethodCounts[payment.method] = (paymentMethodCounts[payment.method] || 0) + 1;
+                
+                if (payment.method === 'efectivo') {
+                    totalCash += order.total;
+                } else if (payment.method === 'yape') {
+                    totalYape += order.total;
+                } else if (payment.method === 'pendiente_yape') {
+                    totalPendingYape += order.total;
+                } else if (payment.method === 'mixto') {
+                    totalCash += payment.cash_amount || 0;
+                    totalYape += payment.yape_amount || 0;
+                }
+            } else if (order.status === 'delivered') {
+                // Fallback for orders delivered before payment method tracking was added: default to cash
+                totalCash += order.total;
+                paymentMethodCounts['efectivo']++;
+            }
         });
 
         const flavorData = Object.entries(flavorCounts)
@@ -112,6 +144,14 @@ export function Reports() {
             }))
             .sort((a, b) => a.value - b.value); // Fastest first
 
+        // Payment pie chart data formatting
+        const paymentPieData = [
+            { name: 'Efectivo 💵', value: paymentMethodCounts['efectivo'] },
+            { name: 'Yape 📱', value: paymentMethodCounts['yape'] },
+            { name: 'Mixto ⚖️', value: paymentMethodCounts['mixto'] },
+            { name: 'Pend. Yape ⏳', value: paymentMethodCounts['pendiente_yape'] }
+        ].filter(item => item.value > 0);
+
         return { 
             totalRevenue, 
             flavorData, 
@@ -120,9 +160,13 @@ export function Reports() {
             avgPrepTime,
             avgShipTime,
             avgTotalTime,
-            driverSpeedData
+            driverSpeedData,
+            totalCash,
+            totalYape,
+            totalPendingYape,
+            paymentPieData
         };
-    }, [orders, flavors, orderTimelines]);
+    }, [orders, flavors, orderTimelines, orderPayments]);
 
     return (
         <div className="space-y-6 pb-20">
@@ -156,6 +200,43 @@ export function Reports() {
                     </div>
                     <div className="text-xs font-bold text-[var(--primary-color)] mt-1">
                         {stats.flavorData[0]?.value || 0} Pedidos
+                    </div>
+                </div>
+            </div>
+
+            {/* Fila de Cuadre de Caja (Efectivo vs Yape vs Pendientes) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="ios-card p-5 bg-white border border-black/5 rounded-3xl shadow-sm flex items-center justify-between">
+                    <div>
+                        <h4 className="text-[10px] font-black text-[#8E8E93] uppercase tracking-widest mb-1">Caja Efectivo (Total)</h4>
+                        <div className="text-2xl font-brand text-emerald-600">
+                            S/ {stats.totalCash.toFixed(2)}
+                        </div>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg font-bold">
+                        💵
+                    </div>
+                </div>
+                <div className="ios-card p-5 bg-white border border-black/5 rounded-3xl shadow-sm flex items-center justify-between">
+                    <div>
+                        <h4 className="text-[10px] font-black text-[#8E8E93] uppercase tracking-widest mb-1">Caja Yape (Total)</h4>
+                        <div className="text-2xl font-brand text-purple-600">
+                            S/ {stats.totalYape.toFixed(2)}
+                        </div>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg font-bold">
+                        📱
+                    </div>
+                </div>
+                <div className="ios-card p-5 bg-white border border-black/5 rounded-3xl shadow-sm flex items-center justify-between">
+                    <div>
+                        <h4 className="text-[10px] font-black text-[#8E8E93] uppercase tracking-widest mb-1">Pendiente de Yapeo</h4>
+                        <div className="text-2xl font-brand text-amber-600">
+                            S/ {stats.totalPendingYape.toFixed(2)}
+                        </div>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg font-bold">
+                        ⏳
                     </div>
                 </div>
             </div>
@@ -197,9 +278,9 @@ export function Reports() {
                 </div>
             </div>
 
-            {/* Gráficos de Ventas */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="ios-card p-6 bg-white border border-black/5 rounded-3xl shadow-sm">
+            {/* Gráficos de Ventas y Métodos de Pago */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="ios-card p-6 bg-white border border-black/5 rounded-3xl shadow-sm lg:col-span-2">
                     <h3 className="text-xs font-black text-[#8E8E93] uppercase mb-8 flex items-center gap-2 tracking-widest">
                         <BarChart3 className="w-4 h-4 text-[var(--primary-color)]" />
                         Ranking de Sabores
@@ -228,19 +309,67 @@ export function Reports() {
                 </div>
 
                 <div className="ios-card p-6 bg-white border border-black/5 rounded-3xl shadow-sm">
+                    <h3 className="text-xs font-black text-[#8E8E93] uppercase mb-6 flex items-center gap-2 tracking-widest">
+                        <ShoppingBag className="w-4 h-4 text-[var(--primary-color)]" />
+                        Distribución de Métodos de Pago
+                    </h3>
+                    {stats.paymentPieData.length === 0 ? (
+                        <div className="text-center py-16 text-[#8E8E93] italic text-sm">
+                            No hay datos de pagos disponibles
+                        </div>
+                    ) : (
+                        <div className="h-80 w-full flex flex-col items-center justify-center gap-4">
+                            <div className="h-44 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={stats.paymentPieData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={50}
+                                            outerRadius={75}
+                                            paddingAngle={6}
+                                            dataKey="value"
+                                        >
+                                            {stats.paymentPieData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
+                                        />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <div className="w-full grid grid-cols-2 gap-2 text-[10px] font-bold text-[#2D1B4E] uppercase px-2">
+                                {stats.paymentPieData.map((item, idx) => (
+                                    <div key={idx} className="flex items-center gap-1.5 truncate">
+                                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+                                        <span className="truncate">{item.name}: {item.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Fila de Distribución de Porciones y Trazados */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="ios-card p-6 bg-white border border-black/5 rounded-3xl shadow-sm lg:col-span-1">
                     <h3 className="text-xs font-black text-[#8E8E93] uppercase mb-8 flex items-center gap-2 tracking-widest">
                         <ShoppingBag className="w-4 h-4 text-[var(--primary-color)]" />
                         Distribución de Porciones
                     </h3>
-                    <div className="h-80 w-full">
+                    <div className="h-72 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
                                     data={stats.portionData}
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={70}
-                                    outerRadius={100}
+                                    innerRadius={60}
+                                    outerRadius={85}
                                     paddingAngle={8}
                                     dataKey="value"
                                 >
@@ -256,11 +385,8 @@ export function Reports() {
                         </ResponsiveContainer>
                     </div>
                 </div>
-            </div>
 
-            {/* Rendimiento de Repartidores (Pedidos vs Tiempos) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="ios-card p-6 bg-white border border-black/5 rounded-3xl shadow-sm">
+                <div className="ios-card p-6 bg-white border border-black/5 rounded-3xl shadow-sm lg:col-span-1">
                     <h3 className="text-xs font-black text-[#8E8E93] uppercase mb-6 flex items-center gap-2 tracking-widest">
                         <Users className="w-4 h-4 text-[var(--primary-color)]" />
                         Total de Pedidos por Repartidor
@@ -271,17 +397,17 @@ export function Reports() {
                             <p className="text-[#8E8E93] text-sm italic">No hay datos de reparto disponibles</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
                             {stats.deliveryData.map((item, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-4 bg-[#F2F2F7] rounded-2xl border border-black/5">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-[10px] font-black text-[#2D1B4E]">
+                                <div key={idx} className="flex items-center justify-between p-3.5 bg-[#F2F2F7] rounded-2xl border border-black/5">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 bg-white rounded-full flex items-center justify-center text-[10px] font-black text-[#2D1B4E]">
                                             {idx + 1}
                                         </div>
-                                        <span className="font-bold text-[#2D1B4E]">{item.name}</span>
+                                        <span className="font-bold text-sm text-[#2D1B4E]">{item.name}</span>
                                     </div>
                                     <div className="flex flex-col items-end">
-                                        <span className="text-lg font-brand text-[var(--primary-color)]">{item.value}</span>
+                                        <span className="text-md font-brand text-[var(--primary-color)]">{item.value}</span>
                                         <span className="text-[8px] font-black text-[#8E8E93] uppercase tracking-tighter">Pedidos</span>
                                     </div>
                                 </div>
@@ -290,18 +416,17 @@ export function Reports() {
                     )}
                 </div>
 
-                <div className="ios-card p-6 bg-white border border-black/5 rounded-3xl shadow-sm">
+                <div className="ios-card p-6 bg-white border border-black/5 rounded-3xl shadow-sm lg:col-span-1">
                     <h3 className="text-xs font-black text-[#8E8E93] uppercase mb-6 flex items-center gap-2 tracking-widest">
                         <Clock className="w-4 h-4 text-[var(--primary-color)]" />
                         Tiempo Promedio de Entrega (Menos es mejor)
                     </h3>
                     {stats.driverSpeedData.length === 0 ? (
-                        <div className="text-center py-12">
-                            <Clock className="w-12 h-12 mx-auto text-[#E5E5EA] mb-4" />
-                            <p className="text-[#8E8E93] text-sm italic">No hay datos de tiempo disponibles</p>
+                        <div className="text-center py-12 text-[#8E8E93] italic text-sm">
+                            No hay datos de tiempo disponibles
                         </div>
                     ) : (
-                        <div className="h-64 w-full">
+                        <div className="h-72 w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={stats.driverSpeedData} layout="vertical">
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F2F2F7" />
@@ -309,16 +434,16 @@ export function Reports() {
                                     <YAxis
                                         dataKey="name"
                                         type="category"
-                                        width={100}
+                                        width={80}
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fontSize: 11, fontWeight: 'bold', fill: '#2D1B4E' }}
+                                        tick={{ fontSize: 10, fontWeight: 'bold', fill: '#2D1B4E' }}
                                     />
                                     <Tooltip
                                         cursor={{ fill: '#F2F2F7' }}
-                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '12px' }}
+                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '10px' }}
                                     />
-                                    <Bar dataKey="value" fill="#34C759" radius={[0, 8, 8, 0]} barSize={24} />
+                                    <Bar dataKey="value" fill="#34C759" radius={[0, 8, 8, 0]} barSize={18} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>

@@ -3,14 +3,22 @@ import { useOrderStore } from '../store/useOrderStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { Order } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Truck, Phone, MessageSquare, MapPin, Check, LogOut, Navigation, AlertTriangle } from 'lucide-react';
+import { Truck, Phone, MessageSquare, MapPin, Check, LogOut, Navigation, AlertTriangle, X, DollarSign, Smartphone } from 'lucide-react';
 
 export function DeliveryPortal() {
     const { orders, deliveryPersons, updateOrderStatus, fetchOrders, fetchDeliveryPersons } = useOrderStore();
+    const { recordOrderPayment } = useSettingsStore();
+    
     const [selectedDriver, setSelectedDriver] = useState<string | null>(() => {
         return localStorage.getItem('active_delivery_driver');
     });
     const [gpsStatus, setGpsStatus] = useState<'active' | 'inactive' | 'denied' | 'unsupported'>('inactive');
+    
+    // Payment confirmation modal states
+    const [payingOrder, setPayingOrder] = useState<Order | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<string>('efectivo');
+    const [cashAmount, setCashAmount] = useState<string>('');
+    const [yapeAmount, setYapeAmount] = useState<string>('');
 
     useEffect(() => {
         fetchOrders();
@@ -27,10 +35,44 @@ export function DeliveryPortal() {
         localStorage.removeItem('active_delivery_driver');
     };
 
-    const handleMarkAsDelivered = async (orderId: number, customerName: string) => {
-        if (confirm(`¿Confirmar entrega para ${customerName}?`)) {
-            await updateOrderStatus(orderId, 'delivered');
+    const handleDeliverClick = (order: Order) => {
+        setPayingOrder(order);
+        setPaymentMethod('efectivo');
+        setCashAmount(order.total.toString());
+        setYapeAmount('');
+    };
+
+    const handleConfirmDelivery = async () => {
+        if (!payingOrder) return;
+
+        let cashNum = 0;
+        let yapeNum = 0;
+
+        if (paymentMethod === 'efectivo') {
+            cashNum = payingOrder.total;
+        } else if (paymentMethod === 'yape') {
+            yapeNum = payingOrder.total;
+        } else if (paymentMethod === 'mixto') {
+            cashNum = parseFloat(cashAmount) || 0;
+            yapeNum = parseFloat(yapeAmount) || 0;
+            
+            const totalSum = cashNum + yapeNum;
+            if (Math.abs(totalSum - payingOrder.total) > 0.01) {
+                alert(`La suma (S/ ${totalSum.toFixed(2)}) debe ser igual al total del pedido (S/ ${payingOrder.total.toFixed(2)}).`);
+                return;
+            }
         }
+
+        // 1. Record the payment settings entry
+        await recordOrderPayment(payingOrder.id, paymentMethod, cashNum || undefined, yapeNum || undefined);
+        
+        // 2. Change order status to delivered
+        await updateOrderStatus(payingOrder.id, 'delivered');
+
+        // 3. Clear modal states
+        setPayingOrder(null);
+        setCashAmount('');
+        setYapeAmount('');
     };
 
     // Filter orders assigned to this driver that are in 'shipping' status
@@ -52,10 +94,8 @@ export function DeliveryPortal() {
 
         let lastUpdateTime = 0;
         
-        // Success handler
         const handleSuccess = (position: GeolocationPosition) => {
             const now = Date.now();
-            // Throttle database updates to at most once every 15 seconds
             if (now - lastUpdateTime >= 15000) {
                 const { latitude, longitude } = position.coords;
                 useSettingsStore.getState().updateDriverLocation(selectedDriver, latitude, longitude);
@@ -64,7 +104,6 @@ export function DeliveryPortal() {
             }
         };
 
-        // Error handler
         const handleError = (error: GeolocationPositionError) => {
             console.error('Error retrieving geolocation:', error);
             if (error.code === error.PERMISSION_DENIED) {
@@ -84,7 +123,6 @@ export function DeliveryPortal() {
             }
         );
 
-        // Immediate single coordinate fetch on mount/activation
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 const { latitude, longitude } = pos.coords;
@@ -158,7 +196,7 @@ export function DeliveryPortal() {
     }
 
     return (
-        <div className="min-h-screen bg-[#F2F2F7] pb-12">
+        <div className="min-h-screen bg-[#F2F2F7] pb-12 relative">
             {/* Header */}
             <header className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-black/5 px-6 py-4 flex justify-between items-center z-40 shadow-sm">
                 <div className="flex items-center gap-2">
@@ -305,7 +343,7 @@ export function DeliveryPortal() {
 
                                 {/* Deliver action */}
                                 <button
-                                    onClick={() => handleMarkAsDelivered(order.id, order.customer_name)}
+                                    onClick={() => handleDeliverClick(order)}
                                     className="w-full bg-[var(--primary-color)] text-white py-4 rounded-2xl shadow-lg shadow-orange-100 font-brand text-lg tracking-widest uppercase flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer border-none"
                                 >
                                     <Check className="w-5 h-5 stroke-[3px]" />
@@ -316,6 +354,170 @@ export function DeliveryPortal() {
                     )}
                 </AnimatePresence>
             </main>
+
+            {/* Payment Method Modal */}
+            <AnimatePresence>
+                {payingOrder && (
+                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setPayingOrder(null)}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ y: "100%" }}
+                            animate={{ y: 0 }}
+                            exit={{ y: "100%" }}
+                            className="relative w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl z-10 space-y-5"
+                        >
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <span className="text-[10px] font-black text-[#8E8E93] uppercase tracking-wider block">Confirmar Entrega</span>
+                                    <h3 className="text-xl font-brand text-[#2D1B4E] uppercase">¿Cómo pagó el cliente?</h3>
+                                </div>
+                                <button
+                                    onClick={() => setPayingOrder(null)}
+                                    className="bg-[#E9E9EB] p-1.5 rounded-full cursor-pointer hover:bg-gray-200 transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="bg-[#F2F2F7] p-3 rounded-2xl flex justify-between items-center text-sm font-bold text-[#2D1B4E] border border-black/5">
+                                <span>Total del Pedido:</span>
+                                <span className="text-lg text-[var(--primary-color)]">S/ {payingOrder.total.toFixed(2)}</span>
+                            </div>
+
+                            {/* Payment Methods Grid */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPaymentMethod('efectivo');
+                                        setCashAmount(payingOrder.total.toString());
+                                        setYapeAmount('');
+                                    }}
+                                    className={cn(
+                                        "p-4 rounded-2xl border text-center transition-all flex flex-col items-center gap-1.5 font-bold cursor-pointer",
+                                        paymentMethod === 'efectivo' 
+                                            ? "border-[var(--primary-color)] bg-orange-50 text-[var(--primary-color)]" 
+                                            : "border-black/5 bg-[#F2F2F7] text-[#2D1B4E] hover:bg-[#E5E5EA]"
+                                    )}
+                                >
+                                    <DollarSign className="w-6 h-6" />
+                                    <span className="text-xs uppercase tracking-wide">Efectivo</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPaymentMethod('yape');
+                                        setYapeAmount(payingOrder.total.toString());
+                                        setCashAmount('');
+                                    }}
+                                    className={cn(
+                                        "p-4 rounded-2xl border text-center transition-all flex flex-col items-center gap-1.5 font-bold cursor-pointer",
+                                        paymentMethod === 'yape' 
+                                            ? "border-[var(--primary-color)] bg-orange-50 text-[var(--primary-color)]" 
+                                            : "border-black/5 bg-[#F2F2F7] text-[#2D1B4E] hover:bg-[#E5E5EA]"
+                                    )}
+                                >
+                                    <Smartphone className="w-6 h-6" />
+                                    <span className="text-xs uppercase tracking-wide">Yape</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPaymentMethod('mixto');
+                                        setCashAmount('');
+                                        setYapeAmount('');
+                                    }}
+                                    className={cn(
+                                        "p-4 rounded-2xl border text-center transition-all flex flex-col items-center gap-1.5 font-bold cursor-pointer",
+                                        paymentMethod === 'mixto' 
+                                            ? "border-[var(--primary-color)] bg-orange-50 text-[var(--primary-color)]" 
+                                            : "border-black/5 bg-[#F2F2F7] text-[#2D1B4E] hover:bg-[#E5E5EA]"
+                                    )}
+                                >
+                                    <div className="flex gap-1">
+                                        <DollarSign className="w-4 h-4" />
+                                        <Smartphone className="w-4 h-4" />
+                                    </div>
+                                    <span className="text-xs uppercase tracking-wide">Mixto</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPaymentMethod('pendiente_yape');
+                                        setCashAmount('');
+                                        setYapeAmount('');
+                                    }}
+                                    className={cn(
+                                        "p-4 rounded-2xl border text-center transition-all flex flex-col items-center gap-1.5 font-bold cursor-pointer",
+                                        paymentMethod === 'pendiente_yape' 
+                                            ? "border-amber-400 bg-amber-50 text-amber-700" 
+                                            : "border-black/5 bg-[#F2F2F7] text-[#2D1B4E] hover:bg-[#E5E5EA]"
+                                    )}
+                                >
+                                    <span className="text-xl">⏳</span>
+                                    <span className="text-xs uppercase tracking-wide">Pend. Yape</span>
+                                </button>
+                            </div>
+
+                            {/* Mixed Payment Details */}
+                            {paymentMethod === 'mixto' && (
+                                <motion.div 
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    className="space-y-3 pt-2"
+                                >
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-[#8E8E93] uppercase tracking-widest ml-1">Monto Efectivo (S/)</label>
+                                            <input
+                                                type="number"
+                                                step="0.10"
+                                                placeholder="0.00"
+                                                className="w-full px-4 py-3 rounded-xl bg-[#F2F2F7] border border-black/5 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all font-bold text-sm"
+                                                value={cashAmount}
+                                                onChange={e => setCashAmount(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-[#8E8E93] uppercase tracking-widest ml-1">Monto Yape (S/)</label>
+                                            <input
+                                                type="number"
+                                                step="0.10"
+                                                placeholder="0.00"
+                                                className="w-full px-4 py-3 rounded-xl bg-[#F2F2F7] border border-black/5 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all font-bold text-sm"
+                                                value={yapeAmount}
+                                                onChange={e => setYapeAmount(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="bg-orange-50 border border-orange-200/50 p-3 rounded-xl text-[10px] font-bold text-[var(--primary-color)] flex justify-between">
+                                        <span>Total Ingresado: S/ {((parseFloat(cashAmount) || 0) + (parseFloat(yapeAmount) || 0)).toFixed(2)}</span>
+                                        <span>Falta: S/ {(payingOrder.total - ((parseFloat(cashAmount) || 0) + (parseFloat(yapeAmount) || 0))).toFixed(2)}</span>
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {/* Confirm Action Button */}
+                            <button
+                                onClick={handleConfirmDelivery}
+                                className="w-full bg-[#2D1B4E] text-white py-4 rounded-2xl font-brand text-lg tracking-widest uppercase flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer border-none"
+                            >
+                                <Check className="w-5 h-5" />
+                                Confirmar Entrega
+                            </button>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

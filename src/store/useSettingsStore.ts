@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
 import { OrderStatus } from '../types';
 
+export interface OrderPayment {
+    method: string;
+    cash_amount?: number;
+    yape_amount?: number;
+    confirmed_at: string;
+}
+
 export interface SettingsStore {
     primaryColor: string;
     fontFamily: string;
@@ -9,11 +16,13 @@ export interface SettingsStore {
     shopLng: number | null;
     driverLocations: Record<string, { lat: number; lng: number; lastUpdated: string }>;
     orderTimelines: Record<number, { pending_at: string; preparing_at?: string; shipping_at?: string; delivered_at?: string }>;
+    orderPayments: Record<number, OrderPayment>;
     isLoading: boolean;
     fetchSettings: (silent?: boolean) => Promise<void>;
     updateSetting: (key: string, value: string) => Promise<void>;
     updateDriverLocation: (driverName: string, lat: number, lng: number) => Promise<void>;
     recordOrderTimestamp: (orderId: number, status: OrderStatus, pendingAt?: string) => Promise<void>;
+    recordOrderPayment: (orderId: number, method: string, cashAmount?: number, yapeAmount?: number) => Promise<void>;
     subscribeToSettings: () => void;
     unsubscribeFromSettings: () => void;
 }
@@ -27,6 +36,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     shopLng: null,
     driverLocations: {},
     orderTimelines: {},
+    orderPayments: {},
     isLoading: true,
 
     fetchSettings: async (silent = false) => {
@@ -35,6 +45,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         if (data) {
             const driverLocs: Record<string, { lat: number; lng: number; lastUpdated: string }> = {};
             const timelines: Record<number, { pending_at: string; preparing_at?: string; shipping_at?: string; delivered_at?: string }> = {};
+            const payments: Record<number, OrderPayment> = {};
             
             data.forEach(setting => {
                 if (setting.key === 'primary_color') set({ primaryColor: setting.value });
@@ -71,11 +82,25 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
                         }
                     }
                 }
+
+                // Parse order payments
+                if (setting.key.startsWith('order_payment_')) {
+                    const orderId = parseInt(setting.key.replace('order_payment_', ''));
+                    if (!isNaN(orderId)) {
+                        try {
+                            const payment = JSON.parse(setting.value);
+                            payments[orderId] = payment;
+                        } catch (e) {
+                            console.error('Error parsing order payment JSON:', e);
+                        }
+                    }
+                }
             });
             
             set({ 
                 driverLocations: driverLocs,
-                orderTimelines: timelines
+                orderTimelines: timelines,
+                orderPayments: payments
             });
         }
         if (!silent) set({ isLoading: false });
@@ -130,6 +155,27 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
             orderTimelines: {
                 ...state.orderTimelines,
                 [orderId]: newTimeline
+            }
+        }));
+    },
+
+    recordOrderPayment: async (orderId: number, method: string, cashAmount?: number, yapeAmount?: number) => {
+        const key = `order_payment_${orderId}`;
+        const confirmedAt = new Date().toISOString();
+        const paymentObj = {
+            method,
+            cash_amount: cashAmount,
+            yape_amount: yapeAmount,
+            confirmed_at: confirmedAt
+        };
+        const value = JSON.stringify(paymentObj);
+
+        await supabase.from('settings').upsert({ key, value });
+
+        set(state => ({
+            orderPayments: {
+                ...state.orderPayments,
+                [orderId]: paymentObj
             }
         }));
     },

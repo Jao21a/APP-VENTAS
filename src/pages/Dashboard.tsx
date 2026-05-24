@@ -13,7 +13,7 @@ function cn(...inputs: ClassValue[]) {
 
 export function Dashboard() {
     const { orders, isLoading, deleteOrder, updateOrderStatus, updateOrdersStatusInBatch, deliveryPersons } = useOrderStore();
-    const { orderTimelines } = useSettingsStore();
+    const { orderTimelines, orderPayments } = useSettingsStore();
     const [assigningOrder, setAssigningOrder] = useState<Order | null>(null);
     const [tick, setTick] = useState(0);
 
@@ -332,6 +332,50 @@ export function Dashboard() {
                                                 <div className="mt-3 flex items-center gap-2 text-[10px] font-black text-[var(--primary-color)] uppercase tracking-widest bg-orange-50 w-fit px-2 py-1 rounded-lg">
                                                     <Truck className="w-3.5 h-3.5" />
                                                     Repartidor: {order.delivery_person}
+                                                </div>
+                                            )}
+                                            
+                                            {/* Payment Details */}
+                                            {order.status === 'delivered' && orderPayments[order.id] && (
+                                                <div className="mt-3 pt-3 border-t border-black/5 flex flex-col gap-2">
+                                                    {(() => {
+                                                        const p = orderPayments[order.id];
+                                                        if (p.method === 'efectivo') {
+                                                            return (
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider border border-emerald-100 w-fit">
+                                                                    💵 Efectivo: S/ {order.total.toFixed(2)}
+                                                                </span>
+                                                            );
+                                                        }
+                                                        if (p.method === 'yape') {
+                                                            return (
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-black text-purple-700 bg-purple-50 px-2 py-1 rounded-lg uppercase tracking-wider border border-purple-100 w-fit">
+                                                                    📱 Yape: S/ {order.total.toFixed(2)}
+                                                                </span>
+                                                            );
+                                                        }
+                                                        if (p.method === 'pendiente_yape') {
+                                                            return (
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-1 rounded-lg uppercase tracking-wider border border-amber-200 w-fit">
+                                                                    ⏳ Pendiente Yape
+                                                                </span>
+                                                            );
+                                                        }
+                                                        if (p.method === 'mixto') {
+                                                            return (
+                                                                <div className="space-y-1.5">
+                                                                    <div className="inline-flex items-center gap-1 text-[10px] font-black text-blue-700 bg-blue-50 px-2 py-1 rounded-lg uppercase tracking-wider border border-blue-100 w-fit">
+                                                                        ⚖️ Mixto: S/ {order.total.toFixed(2)}
+                                                                    </div>
+                                                                    <div className="flex gap-2 text-[9px] font-bold text-[#8E8E93] uppercase tracking-wider pl-1">
+                                                                        <span>Efec: S/ {p.cash_amount?.toFixed(2) || '0.00'}</span>
+                                                                        <span>Yape: S/ {p.yape_amount?.toFixed(2) || '0.00'}</span>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
                                                 </div>
                                             )}
                                         </div>
