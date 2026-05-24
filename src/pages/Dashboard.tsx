@@ -13,7 +13,7 @@ function cn(...inputs: ClassValue[]) {
 
 export function Dashboard() {
     const { orders, isLoading, deleteOrder, updateOrderStatus, updateOrdersStatusInBatch, deliveryPersons } = useOrderStore();
-    const { orderTimelines, orderPayments } = useSettingsStore();
+    const { orderTimelines, orderPayments, kitchenReadyOrders } = useSettingsStore();
     const [assigningOrder, setAssigningOrder] = useState<Order | null>(null);
     const [tick, setTick] = useState(0);
 
@@ -332,6 +332,13 @@ export function Dashboard() {
                                                 <div className="mt-3 flex items-center gap-2 text-[10px] font-black text-[var(--primary-color)] uppercase tracking-widest bg-orange-50 w-fit px-2 py-1 rounded-lg">
                                                     <Truck className="w-3.5 h-3.5" />
                                                     Repartidor: {order.delivery_person}
+                                                </div>
+                                            )}
+                                            
+                                            {order.status === 'preparing' && kitchenReadyOrders[order.id] && (
+                                                <div className="mt-3 flex items-center gap-1.5 text-[10px] font-black text-emerald-700 bg-emerald-50 w-fit px-2.5 py-1.5 rounded-lg uppercase tracking-wider border border-emerald-100/60 animate-pulse">
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                                    Listo en Cocina
                                                 </div>
                                             )}
                                             

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { ShoppingBag, Truck, BarChart3, Settings, Plus, Map } from 'lucide-react';
+import { ShoppingBag, Truck, BarChart3, Settings, Plus, Map, ChefHat } from 'lucide-react';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { NewOrderModal } from '../kanban/NewOrderModal';
 import { clsx, type ClassValue } from 'clsx';
@@ -47,6 +47,15 @@ export function AdminLayout() {
                             {link.label}
                         </NavLink>
                     ))}
+                    <a
+                        href="/kitchen-portal"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm uppercase tracking-wide text-[#8E8E93] hover:bg-[#F2F2F7] mt-4 border-t border-black/5 pt-4 hover:text-[var(--primary-color)]"
+                    >
+                        <ChefHat className="w-5 h-5 text-orange-500" />
+                        <span>Ver Cocina ↗</span>
+                    </a>
                 </nav>
 
                 <div className="mt-auto">

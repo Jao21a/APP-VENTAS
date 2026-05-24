@@ -7,6 +7,7 @@ import { MapPage } from './pages/MapPage';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { DeliveryPortal } from './pages/DeliveryPortal';
+import { KitchenPortal } from './pages/KitchenPortal';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useOrderStore } from './store/useOrderStore';
 
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="/delivery-portal" element={<DeliveryPortal />} />
+        <Route path="/kitchen-portal" element={<KitchenPortal />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

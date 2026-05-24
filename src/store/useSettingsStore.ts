@@ -17,12 +17,14 @@ export interface SettingsStore {
     driverLocations: Record<string, { lat: number; lng: number; lastUpdated: string }>;
     orderTimelines: Record<number, { pending_at: string; preparing_at?: string; shipping_at?: string; delivered_at?: string }>;
     orderPayments: Record<number, OrderPayment>;
+    kitchenReadyOrders: Record<number, { ready: boolean; ready_at: string }>;
     isLoading: boolean;
     fetchSettings: (silent?: boolean) => Promise<void>;
     updateSetting: (key: string, value: string) => Promise<void>;
     updateDriverLocation: (driverName: string, lat: number, lng: number) => Promise<void>;
     recordOrderTimestamp: (orderId: number, status: OrderStatus, pendingAt?: string) => Promise<void>;
     recordOrderPayment: (orderId: number, method: string, cashAmount?: number, yapeAmount?: number) => Promise<void>;
+    markOrderAsReady: (orderId: number, ready: boolean) => Promise<void>;
     subscribeToSettings: () => void;
     unsubscribeFromSettings: () => void;
 }
@@ -37,6 +39,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     driverLocations: {},
     orderTimelines: {},
     orderPayments: {},
+    kitchenReadyOrders: {},
     isLoading: true,
 
     fetchSettings: async (silent = false) => {
@@ -46,6 +49,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
             const driverLocs: Record<string, { lat: number; lng: number; lastUpdated: string }> = {};
             const timelines: Record<number, { pending_at: string; preparing_at?: string; shipping_at?: string; delivered_at?: string }> = {};
             const payments: Record<number, OrderPayment> = {};
+            const readyOrders: Record<number, { ready: boolean; ready_at: string }> = {};
             
             data.forEach(setting => {
                 if (setting.key === 'primary_color') set({ primaryColor: setting.value });
@@ -95,12 +99,26 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
                         }
                     }
                 }
+
+                // Parse kitchen ready orders
+                if (setting.key.startsWith('kitchen_ready_')) {
+                    const orderId = parseInt(setting.key.replace('kitchen_ready_', ''));
+                    if (!isNaN(orderId)) {
+                        try {
+                            const readyObj = JSON.parse(setting.value);
+                            readyOrders[orderId] = readyObj;
+                        } catch (e) {
+                            console.error('Error parsing kitchen ready JSON:', e);
+                        }
+                    }
+                }
             });
             
             set({ 
                 driverLocations: driverLocs,
                 orderTimelines: timelines,
-                orderPayments: payments
+                orderPayments: payments,
+                kitchenReadyOrders: readyOrders
             });
         }
         if (!silent) set({ isLoading: false });
@@ -178,6 +196,31 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
                 [orderId]: paymentObj
             }
         }));
+    },
+
+    markOrderAsReady: async (orderId: number, ready: boolean) => {
+        const key = `kitchen_ready_${orderId}`;
+        if (ready) {
+            const readyObj = {
+                ready: true,
+                ready_at: new Date().toISOString()
+            };
+            const value = JSON.stringify(readyObj);
+            await supabase.from('settings').upsert({ key, value });
+            set(state => ({
+                kitchenReadyOrders: {
+                    ...state.kitchenReadyOrders,
+                    [orderId]: readyObj
+                }
+            }));
+        } else {
+            await supabase.from('settings').delete().eq('key', key);
+            set(state => {
+                const updated = { ...state.kitchenReadyOrders };
+                delete updated[orderId];
+                return { kitchenReadyOrders: updated };
+            });
+        }
     },
 
     subscribeToSettings: () => {
