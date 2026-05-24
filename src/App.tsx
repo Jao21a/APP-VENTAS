@@ -6,6 +6,7 @@ import { Deliverys } from './pages/Deliverys';
 import { MapPage } from './pages/MapPage';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
+import { DeliveryPortal } from './pages/DeliveryPortal';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useOrderStore } from './store/useOrderStore';
 
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
         </Route>
+        <Route path="/delivery-portal" element={<DeliveryPortal />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

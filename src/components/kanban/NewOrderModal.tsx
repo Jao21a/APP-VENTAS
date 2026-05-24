@@ -1,9 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOrderStore } from '../../store/useOrderStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Fix for default marker icons in React Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+const parseCoordinates = (val: string): { lat: string; lng: string } | null => {
+    // 1. Try to find standard query string coordinates: q=lat,lng or daddr=lat,lng or saddr=lat,lng or query=lat,lng
+    const queryMatch = val.match(/[?&](q|daddr|saddr|query|ll)=(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+    if (queryMatch) {
+        return { lat: queryMatch[2], lng: queryMatch[3] };
+    }
+
+    // 2. Try to find coordinates in path segment: /@lat,lng or /place/lat,lng
+    const pathMatch = val.match(/\/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (pathMatch) {
+        return { lat: pathMatch[1], lng: pathMatch[2] };
+    }
+
+    // 3. Try to find raw coordinates in text: -12.04318, -77.02824
+    const rawMatch = val.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+    if (rawMatch) {
+        return { lat: rawMatch[1], lng: rawMatch[2] };
+    }
+
+    return null;
+};
+
+const MapClickPicker = ({ lat, lng, onChange }: { lat: number | null, lng: number | null, onChange: (lat: number, lng: number) => void }) => {
+    const map = useMap();
+
+    useMapEvents({
+        click(e) {
+            onChange(e.latlng.lat, e.latlng.lng);
+        }
+    });
+
+    useEffect(() => {
+        if (lat && lng) {
+            map.setView([lat, lng], map.getZoom());
+        }
+    }, [lat, lng, map]);
+
+    return lat && lng ? <Marker position={[lat, lng]} /> : null;
+};
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -16,8 +68,10 @@ interface Props {
 
 export function NewOrderModal({ isOpen, onClose }: Props) {
     const { flavors, createOrder } = useOrderStore();
+    const { shopLat, shopLng } = useSettingsStore();
     const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
     const [selectedPortion, setSelectedPortion] = useState<string>('10');
+    const [showMiniMap, setShowMiniMap] = useState(false);
     const [newOrder, setNewOrder] = useState({
         customer_name: '',
         customer_phone: '',
@@ -118,7 +172,7 @@ export function NewOrderModal({ isOpen, onClose }: Props) {
                                             type="button"
                                             onClick={() => toggleFlavor(flavor.name)}
                                             className={cn(
-                                                "flavor-pill px-4 py-2.5 text-xs font-bold rounded-xl border transition-all",
+                                                "px-4 py-2.5 text-xs font-bold rounded-xl border transition-all cursor-pointer",
                                                 selectedFlavors.includes(flavor.name) ? "bg-[var(--primary-color)] text-white border-[var(--primary-color)] shadow-md shadow-orange-100" : "bg-[#F2F2F7] text-[#2D1B4E] border-transparent hover:bg-[#E5E5EA]"
                                             )}
                                         >
@@ -178,21 +232,30 @@ export function NewOrderModal({ isOpen, onClose }: Props) {
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-baseline">
                                         <label className="text-[10px] font-black text-[#8E8E93] uppercase tracking-widest ml-1">Enlace de Ubicación / Coordenadas</label>
-                                        {(newOrder.lat && newOrder.lng) && (
-                                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">✓ Mapa Activo</span>
-                                        )}
+                                        <div className="flex gap-2">
+                                            {(newOrder.lat && newOrder.lng) && (
+                                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">✓ Mapa Activo</span>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowMiniMap(!showMiniMap)}
+                                                className="text-[10px] font-bold text-[var(--primary-color)] hover:underline uppercase tracking-wider cursor-pointer"
+                                            >
+                                                {showMiniMap ? 'Ocultar Mapa' : 'Fijar en Mapa'}
+                                            </button>
+                                        </div>
                                     </div>
                                     <input
                                         type="text"
-                                        className="w-full px-4 py-3 rounded-xl bg-[#F2F2F7] border border-black/5 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all"
+                                        className="w-full px-4 py-3 rounded-xl bg-[#F2F2F7] border border-black/5 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all text-sm"
                                         placeholder="Ej: https://maps.google.com/?q=-12.04,-77.02 o pega lat, lng..."
                                         value={newOrder.location_link}
                                         onChange={(e) => {
                                             const val = e.target.value;
-                                            // Extract lat lng if possible
-                                            const match = val.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
-                                            if (match) {
-                                                setNewOrder({ ...newOrder, location_link: val, lat: match[1], lng: match[2] });
+                                            const coords = parseCoordinates(val);
+                                            if (coords) {
+                                                setNewOrder({ ...newOrder, location_link: val, lat: coords.lat, lng: coords.lng });
+                                                setShowMiniMap(true);
                                             } else {
                                                 setNewOrder({ ...newOrder, location_link: val, lat: '', lng: '' });
                                             }
@@ -200,6 +263,37 @@ export function NewOrderModal({ isOpen, onClose }: Props) {
                                     />
                                     {newOrder.location_link && !newOrder.lat && (
                                         <p className="text-[10px] text-orange-500 ml-1">Asegúrate que el enlace tenga las coordenadas.</p>
+                                    )}
+
+                                    {showMiniMap && (
+                                        <div className="w-full h-44 rounded-xl overflow-hidden border border-black/5 mt-2 relative z-0">
+                                            <MapContainer
+                                                center={[
+                                                    parseFloat(newOrder.lat) || shopLat || -12.04318,
+                                                    parseFloat(newOrder.lng) || shopLng || -77.02824
+                                                ]}
+                                                zoom={14}
+                                                style={{ height: '100%', width: '100%' }}
+                                            >
+                                                <TileLayer
+                                                    url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+                                                />
+                                                <MapClickPicker
+                                                    lat={parseFloat(newOrder.lat) || null}
+                                                    lng={parseFloat(newOrder.lng) || null}
+                                                    onChange={(lat, lng) => {
+                                                        const latStr = lat.toFixed(6);
+                                                        const lngStr = lng.toFixed(6);
+                                                        setNewOrder({
+                                                            ...newOrder,
+                                                            lat: latStr,
+                                                            lng: lngStr,
+                                                            location_link: `${latStr}, ${lngStr}`
+                                                        });
+                                                    }}
+                                                />
+                                            </MapContainer>
+                                        </div>
                                     )}
                                 </div>
 

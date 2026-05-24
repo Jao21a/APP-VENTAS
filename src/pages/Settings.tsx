@@ -1,9 +1,38 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useOrderStore } from '../store/useOrderStore';
-import { Palette, Type as TypeIcon, ChefHat, Plus, Trash2 } from 'lucide-react';
+import { Palette, Type as TypeIcon, ChefHat, Plus, Trash2, MapPin } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Fix for default marker icons in React Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+const MarkerPositioner = ({ lat, lng, onChange }: { lat: number; lng: number; onChange: (lat: number, lng: number) => void }) => {
+    const map = useMap();
+
+    useMapEvents({
+        click(e) {
+            onChange(e.latlng.lat, e.latlng.lng);
+        }
+    });
+
+    useEffect(() => {
+        if (!isNaN(lat) && !isNaN(lng)) {
+            map.setView([lat, lng], map.getZoom());
+        }
+    }, [lat, lng, map]);
+
+    return !isNaN(lat) && !isNaN(lng) ? <Marker position={[lat, lng]} /> : null;
+};
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -26,9 +55,16 @@ const FONTS = [
 ];
 
 export function Settings() {
-    const { primaryColor, fontFamily, updateSetting } = useSettingsStore();
+    const { primaryColor, fontFamily, shopLat, shopLng, updateSetting } = useSettingsStore();
     const { flavors, addFlavor, deleteFlavor } = useOrderStore();
     const [newFlavorName, setNewFlavorName] = useState('');
+    const [localLat, setLocalLat] = useState<string>('');
+    const [localLng, setLocalLng] = useState<string>('');
+
+    useEffect(() => {
+        if (shopLat) setLocalLat(shopLat.toString());
+        if (shopLng) setLocalLng(shopLng.toString());
+    }, [shopLat, shopLng]);
 
     const handleAddFlavor = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -126,6 +162,68 @@ export function Settings() {
                             </div>
                         ))}
                         {flavors.length === 0 && <p className="text-sm text-gray-500 text-center py-4">No hay sabores.</p>}
+                    </div>
+                </div>
+
+                <div className="ios-card p-6 bg-white border border-black/5 rounded-3xl shadow-sm">
+                    <h3 className="text-xs font-black text-[#8E8E93] uppercase mb-6 flex items-center gap-2 tracking-widest">
+                        <MapPin className="w-4 h-4 text-[var(--primary-color)]" />
+                        Ubicación del Local
+                    </h3>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-[#8E8E93] uppercase tracking-widest ml-1">Latitud</label>
+                                <input
+                                    type="text"
+                                    placeholder="-12.04318"
+                                    className="w-full px-4 py-3 rounded-xl bg-[#F2F2F7] border border-black/5 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all text-sm"
+                                    value={localLat}
+                                    onChange={e => setLocalLat(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-[#8E8E93] uppercase tracking-widest ml-1">Longitud</label>
+                                <input
+                                    type="text"
+                                    placeholder="-77.02824"
+                                    className="w-full px-4 py-3 rounded-xl bg-[#F2F2F7] border border-black/5 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all text-sm"
+                                    value={localLng}
+                                    onChange={e => setLocalLng(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="w-full h-48 rounded-2xl overflow-hidden border border-black/5 relative z-0">
+                            <MapContainer
+                                center={[parseFloat(localLat) || -12.04318, parseFloat(localLng) || -77.02824]}
+                                zoom={13}
+                                style={{ height: '100%', width: '100%' }}
+                            >
+                                <TileLayer
+                                    url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+                                />
+                                <MarkerPositioner lat={parseFloat(localLat)} lng={parseFloat(localLng)} onChange={(lat, lng) => {
+                                    setLocalLat(lat.toFixed(6));
+                                    setLocalLng(lng.toFixed(6));
+                                }} />
+                            </MapContainer>
+                        </div>
+
+                        <button
+                            onClick={async () => {
+                                if (localLat && localLng) {
+                                    await updateSetting('shop_lat', localLat);
+                                    await updateSetting('shop_lng', localLng);
+                                    alert('Ubicación del local guardada con éxito.');
+                                } else {
+                                    alert('Por favor introduce latitud y longitud válidas.');
+                                }
+                            }}
+                            className="w-full bg-[var(--primary-color)] text-white py-3.5 rounded-xl font-brand text-lg tracking-widest uppercase active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                            Guardar Ubicación
+                        </button>
                     </div>
                 </div>
             </div>

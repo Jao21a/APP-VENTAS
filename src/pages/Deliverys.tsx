@@ -30,11 +30,26 @@ export function Deliverys() {
                                 onChange={e => setNewDeliveryName(e.target.value)}
                             />
                         </div>
-                        <button type="submit" className="w-full bg-[var(--primary-color)] text-white py-4 rounded-2xl shadow-lg shadow-orange-100 font-brand text-xl tracking-widest uppercase active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <button type="submit" className="w-full bg-[var(--primary-color)] text-white py-4 rounded-2xl shadow-lg shadow-orange-100 font-brand text-xl tracking-widest uppercase active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer">
                             <Plus className="w-6 h-6" />
                             Añadir
                         </button>
                     </form>
+                </div>
+
+                <div className="ios-card p-6 bg-[#2D1B4E] text-white rounded-3xl shadow-md space-y-4">
+                    <h2 className="text-xl font-brand uppercase tracking-wider">Portal del Repartidor</h2>
+                    <p className="text-xs text-[#E5E5EA] leading-relaxed">
+                        Comparte este enlace con tus repartidores para que puedan ver su ruta, chatear con clientes y marcar como "Entregado" desde sus celulares en tiempo real.
+                    </p>
+                    <a 
+                        href="/delivery-portal" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="w-full bg-[var(--primary-color)] text-white py-3.5 rounded-2xl font-brand text-md tracking-widest uppercase flex items-center justify-center gap-2 hover:scale-95 transition-all text-center cursor-pointer block"
+                    >
+                        Abrir Portal 📱
+                    </a>
                 </div>
             </div>
 

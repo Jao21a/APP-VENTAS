@@ -16,6 +16,7 @@ interface OrderStore {
     fetchOrders: () => Promise<void>;
     createOrder: (data: Omit<Order, 'id' | 'created_at'>) => Promise<Order | null>;
     updateOrderStatus: (id: number, status: OrderStatus, deliveryPerson?: string) => Promise<void>;
+    updateOrdersStatusInBatch: (ids: number[], status: OrderStatus, deliveryPerson?: string) => Promise<void>;
     deleteOrder: (id: number) => Promise<void>;
 
     fetchDeliveryPersons: () => Promise<void>;
@@ -71,6 +72,15 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         }
 
         await supabase.from('orders').update(payload).eq('id', id);
+    },
+
+    updateOrdersStatusInBatch: async (ids, status, deliveryPerson) => {
+        const payload: any = { status };
+        if (deliveryPerson !== undefined) {
+            payload.delivery_person = deliveryPerson;
+        }
+
+        await supabase.from('orders').update(payload).in('id', ids);
     },
 
     deleteOrder: async (id) => {
