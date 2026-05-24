@@ -22,6 +22,15 @@ export function Dashboard() {
         return () => clearInterval(interval);
     }, []);
 
+    const formatMinutes = (minutes: number): string => {
+        if (minutes >= 60) {
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            return mins > 0 ? `${hours} h ${mins} min` : `${hours} h`;
+        }
+        return `${minutes} min`;
+    };
+
     const getOrderTimeInfo = (order: Order) => {
         const timeline = orderTimelines[order.id];
         const now = new Date();
@@ -29,26 +38,26 @@ export function Dashboard() {
         if (order.status === 'preparing') {
             const prepStart = timeline?.preparing_at ? new Date(timeline.preparing_at) : new Date(order.created_at);
             const diffMin = Math.floor((now.getTime() - prepStart.getTime()) / 60000);
-            return `⏱️ ${diffMin >= 0 ? diffMin : 0} min cocina`;
+            return `⏱️ ${formatMinutes(diffMin >= 0 ? diffMin : 0)} cocina`;
         }
         
         if (order.status === 'shipping') {
             const shipStart = timeline?.shipping_at ? new Date(timeline.shipping_at) : new Date(order.created_at);
             const diffMin = Math.floor((now.getTime() - shipStart.getTime()) / 60000);
-            return `⏱️ ${diffMin >= 0 ? diffMin : 0} min camino`;
+            return `⏱️ ${formatMinutes(diffMin >= 0 ? diffMin : 0)} camino`;
         }
         
         if (order.status === 'delivered') {
             const start = new Date(order.created_at);
             const end = timeline?.delivered_at ? new Date(timeline.delivered_at) : now;
             const diffMin = Math.floor((end.getTime() - start.getTime()) / 60000);
-            return `⏱️ Total: ${diffMin >= 0 ? diffMin : 0} min`;
+            return `⏱️ Total: ${formatMinutes(diffMin >= 0 ? diffMin : 0)}`;
         }
         
         // pending
         const start = new Date(order.created_at);
         const diffMin = Math.floor((now.getTime() - start.getTime()) / 60000);
-        return `⏱️ Hace ${diffMin >= 0 ? diffMin : 0} min`;
+        return `⏱️ Hace ${formatMinutes(diffMin >= 0 ? diffMin : 0)}`;
     };
     const [assigningBatch, setAssigningBatch] = useState<boolean>(false);
     const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([]);
