@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useOrderStore } from '../store/useOrderStore';
+import { useSettingsStore } from '../store/useSettingsStore';
 import { Order, OrderStatus } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChefHat, Truck, Clock, CheckCircle2, Phone, Trash2, ChevronRight, X, MessageSquare, MapPin } from 'lucide-react';
@@ -12,7 +13,43 @@ function cn(...inputs: ClassValue[]) {
 
 export function Dashboard() {
     const { orders, isLoading, deleteOrder, updateOrderStatus, updateOrdersStatusInBatch, deliveryPersons } = useOrderStore();
+    const { orderTimelines } = useSettingsStore();
     const [assigningOrder, setAssigningOrder] = useState<Order | null>(null);
+    const [tick, setTick] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => setTick(t => t + 1), 60000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const getOrderTimeInfo = (order: Order) => {
+        const timeline = orderTimelines[order.id];
+        const now = new Date();
+        
+        if (order.status === 'preparing') {
+            const prepStart = timeline?.preparing_at ? new Date(timeline.preparing_at) : new Date(order.created_at);
+            const diffMin = Math.floor((now.getTime() - prepStart.getTime()) / 60000);
+            return `⏱️ ${diffMin >= 0 ? diffMin : 0} min cocina`;
+        }
+        
+        if (order.status === 'shipping') {
+            const shipStart = timeline?.shipping_at ? new Date(timeline.shipping_at) : new Date(order.created_at);
+            const diffMin = Math.floor((now.getTime() - shipStart.getTime()) / 60000);
+            return `⏱️ ${diffMin >= 0 ? diffMin : 0} min camino`;
+        }
+        
+        if (order.status === 'delivered') {
+            const start = new Date(order.created_at);
+            const end = timeline?.delivered_at ? new Date(timeline.delivered_at) : now;
+            const diffMin = Math.floor((end.getTime() - start.getTime()) / 60000);
+            return `⏱️ Total: ${diffMin >= 0 ? diffMin : 0} min`;
+        }
+        
+        // pending
+        const start = new Date(order.created_at);
+        const diffMin = Math.floor((now.getTime() - start.getTime()) / 60000);
+        return `⏱️ Hace ${diffMin >= 0 ? diffMin : 0} min`;
+    };
     const [assigningBatch, setAssigningBatch] = useState<boolean>(false);
     const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([]);
     const [activeTab, setActiveTab] = useState<OrderStatus | 'all'>('all');
@@ -258,8 +295,11 @@ export function Dashboard() {
                                                 )}
                                                 <div>
                                                     <h3 className="font-bold text-xl text-[#2D1B4E]">{order.customer_name}</h3>
-                                                    <div className="flex items-center text-[#8E8E93] text-sm gap-2 mt-1">
+                                                    <div className="flex items-center text-[#8E8E93] text-xs gap-3 mt-1 flex-wrap">
                                                         <span className="font-medium">{order.customer_phone}</span>
+                                                        <span className="font-bold text-[var(--primary-color)] bg-orange-50 px-2 py-0.5 rounded-lg text-[10px] border border-orange-100/50">
+                                                            {getOrderTimeInfo(order)}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
 import { Order, OrderStatus, DeliveryPerson } from '../types';
+import { useSettingsStore } from './useSettingsStore';
 
 export interface Flavor {
     id: number;
@@ -72,6 +73,11 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         }
 
         await supabase.from('orders').update(payload).eq('id', id);
+        
+        const order = get().orders.find(o => o.id === id);
+        if (order) {
+            await useSettingsStore.getState().recordOrderTimestamp(id, status, order.created_at);
+        }
     },
 
     updateOrdersStatusInBatch: async (ids, status, deliveryPerson) => {
@@ -81,6 +87,13 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         }
 
         await supabase.from('orders').update(payload).in('id', ids);
+
+        for (const id of ids) {
+            const order = get().orders.find(o => o.id === id);
+            if (order) {
+                await useSettingsStore.getState().recordOrderTimestamp(id, status, order.created_at);
+            }
+        }
     },
 
     deleteOrder: async (id) => {
