@@ -4,6 +4,12 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { Order } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Truck, Phone, MessageSquare, MapPin, Check, LogOut, Navigation, AlertTriangle, X, DollarSign, Smartphone } from 'lucide-react';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+    return twMerge(clsx(inputs));
+}
 
 export function DeliveryPortal() {
     const { orders, deliveryPersons, updateOrderStatus, fetchOrders, fetchDeliveryPersons } = useOrderStore();
