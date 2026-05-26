@@ -22,8 +22,8 @@ export function AdminLayout() {
     ];
 
     return (
-        <div className="min-h-screen bg-[#F2F2F7] flex flex-col lg:flex-row relative overflow-x-hidden">
-            <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-black/5 sticky top-0 h-screen p-6">
+        <div className="h-screen w-screen bg-[#F2F2F7] flex flex-col lg:flex-row overflow-hidden">
+            <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-black/5 h-full p-6 shrink-0 overflow-y-auto">
                 <div className="flex items-center gap-3 mb-10">
                     <div className="w-10 h-10 bg-[var(--primary-color)] rounded-full flex items-center justify-center shadow-inner overflow-hidden border-2 border-white transition-colors">
                         <span className="text-xl">🔥</span>
@@ -70,7 +70,7 @@ export function AdminLayout() {
             </aside>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
                 <header className="lg:hidden sticky top-0 z-10 bg-[#F2F2F7]/80 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-black/5">
                     <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-[var(--primary-color)] rounded-full flex items-center justify-center shadow-inner overflow-hidden border-2 border-white transition-colors">

@@ -61,43 +61,90 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
             .single();
 
         if (!error && newOrder) {
+            set((state) => {
+                if (state.orders.some(o => o.id === newOrder.id)) return {};
+                const updatedOrders = [newOrder, ...state.orders];
+                updatedOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                return { orders: updatedOrders };
+            });
             return newOrder;
         }
         return null;
     },
 
     updateOrderStatus: async (id, status, deliveryPerson) => {
+        // Optimistic update
+        set((state) => ({
+            orders: state.orders.map(o => 
+                o.id === id 
+                    ? { ...o, status, ...(deliveryPerson !== undefined ? { delivery_person: deliveryPerson } : {}) } 
+                    : o
+            )
+        }));
+
         const payload: any = { status };
         if (deliveryPerson !== undefined) {
             payload.delivery_person = deliveryPerson;
         }
 
-        await supabase.from('orders').update(payload).eq('id', id);
-        
-        const order = get().orders.find(o => o.id === id);
-        if (order) {
-            await useSettingsStore.getState().recordOrderTimestamp(id, status, order.created_at);
-        }
-    },
+        try {
+            const { error } = await supabase.from('orders').update(payload).eq('id', id);
+            if (error) throw error;
 
-    updateOrdersStatusInBatch: async (ids, status, deliveryPerson) => {
-        const payload: any = { status };
-        if (deliveryPerson !== undefined) {
-            payload.delivery_person = deliveryPerson;
-        }
-
-        await supabase.from('orders').update(payload).in('id', ids);
-
-        for (const id of ids) {
             const order = get().orders.find(o => o.id === id);
             if (order) {
                 await useSettingsStore.getState().recordOrderTimestamp(id, status, order.created_at);
             }
+        } catch (error) {
+            console.error("Error updating order status:", error);
+            get().fetchOrders();
+        }
+    },
+
+    updateOrdersStatusInBatch: async (ids, status, deliveryPerson) => {
+        // Optimistic update
+        set((state) => ({
+            orders: state.orders.map(o => 
+                ids.includes(o.id) 
+                    ? { ...o, status, ...(deliveryPerson !== undefined ? { delivery_person: deliveryPerson } : {}) } 
+                    : o
+            )
+        }));
+
+        const payload: any = { status };
+        if (deliveryPerson !== undefined) {
+            payload.delivery_person = deliveryPerson;
+        }
+
+        try {
+            const { error } = await supabase.from('orders').update(payload).in('id', ids);
+            if (error) throw error;
+
+            for (const id of ids) {
+                const order = get().orders.find(o => o.id === id);
+                if (order) {
+                    await useSettingsStore.getState().recordOrderTimestamp(id, status, order.created_at);
+                }
+            }
+        } catch (error) {
+            console.error("Error updating orders in batch:", error);
+            get().fetchOrders();
         }
     },
 
     deleteOrder: async (id) => {
-        await supabase.from('orders').delete().eq('id', id);
+        // Optimistic update
+        set((state) => ({
+            orders: state.orders.filter(o => o.id !== id)
+        }));
+
+        try {
+            const { error } = await supabase.from('orders').delete().eq('id', id);
+            if (error) throw error;
+        } catch (error) {
+            console.error("Error deleting order:", error);
+            get().fetchOrders();
+        }
     },
 
     fetchDeliveryPersons: async () => {
@@ -130,8 +177,27 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         if (channel) return;
         channel = supabase
             .channel('public:all')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-                get().fetchOrders();
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload: any) => {
+                const { eventType, new: newRecord, old: oldRecord } = payload;
+                if (eventType === 'INSERT') {
+                    const newOrder = newRecord as Order;
+                    set((state) => {
+                        if (state.orders.some(o => o.id === newOrder.id)) return {};
+                        const updatedOrders = [newOrder, ...state.orders];
+                        updatedOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                        return { orders: updatedOrders };
+                    });
+                } else if (eventType === 'UPDATE') {
+                    const updatedOrder = newRecord as Order;
+                    set((state) => ({
+                        orders: state.orders.map(o => o.id === updatedOrder.id ? updatedOrder : o)
+                    }));
+                } else if (eventType === 'DELETE') {
+                    const deletedId = oldRecord.id;
+                    set((state) => ({
+                        orders: state.orders.filter(o => o.id !== deletedId)
+                    }));
+                }
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'flavors' }, () => {
                 get().fetchFlavors();
